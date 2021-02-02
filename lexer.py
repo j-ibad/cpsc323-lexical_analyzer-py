@@ -42,14 +42,14 @@ def lexer(filename):
 
     #Init variables
     tokenPairs = []
-    regex = "^[a-zA-Z][a-zA-Z0-9_\$]+"
+    wordRegex = "^[a-zA-Z][a-zA-Z0-9_\$]+"
 
     #Traverse file line by line, char by char
     for line in file:
         print(line)
         ind = 0
         while ind < len(line):
-            match = re.search(regex, line[ind:])
+            match = re.search(wordRegex, line[ind:])
             print(match)
             if match is None:
                 if line[ind] == "!":    #Comment for rest of line
