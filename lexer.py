@@ -24,7 +24,9 @@ TOKEN_TABLE = {
     1: "KEYWORD",
     2: "IDENTIFIER",
     3: "SEPARATOR",
-    4: "OPERATOR"
+    4: "OPERATOR",
+    5: "INTEGER",
+    6: "FLOAT"
 }
 
 
@@ -43,40 +45,50 @@ def lexer(filename):
     #Init variables
     tokenPairs = []
     wordRegex = "^[a-zA-Z][a-zA-Z0-9_\$]+"
+    numRegex = "[+-]?([0-9]*[.])?[0-9]+"
 
     #Traverse file line by line, char by char
     for line in file:
-        print(line)
+        #print(line)
         ind = 0
         while ind < len(line):
+            #Search for next keyword or identifier
             match = re.search(wordRegex, line[ind:])
-            print(match)
-            if match is None:
+            #print(match)
+            if match is None:   #Keyword or identifier not found
                 if line[ind] == "!":    #Comment for rest of line
                     break
-                elif line[ind] == " ":  #Ignore space
+                elif line[ind] == " " or line[ind] == "\n" or line[ind] == "\t":  #Ignore space, newline, and tab
                     ind += 1
                     continue
                 else:
                     token = SYMBOL_TABLE.get(line[ind])
                     if token is None:
-                        print("Not exp: %s" % line[ind])
-                    else:
+                        match = re.search(numRegex, line[ind:])
+                        if match is None:
+                            print("Not exp 1: [%s]" % line[ind]) #Cant read it
+                        else: #Number found
+                            if '.' in match.group(): #Is a float
+                                tokenPairs.append( [6, match.group()] )
+                            else:   # Is a integers
+                                tokenPairs.append( [5, match.group()] )
+                            
+                    else:   #Detect separators
                         tokenPairs.append( [token, line[ind]] )
                 ind += 1
                 #No matches found
-            else:
+            else:   #Keyword or identifier was found
                 while ind < match.span()[0] + ind:
-                    print("Not exp: %s" % line[ind])
+                    print("Not exp 2: %s" % line[ind])
                     ind += 1
-                    #Detect operators and separators
+                    #Cant read it. Should not reach here.
                 
                 #Detect indentifiers
                 token = SYMBOL_TABLE.get(match.group())
-                print("%s is %s" % (match.group(), token))
-                if token is None:
+                #print("%s is %s" % (match.group(), token))
+                if token is None:   #Is an identifier
                     tokenPairs.append( [2, match.group()] )
-                else:
+                else:   #Is a keyword
                     tokenPairs.append( [token, match.group()] )
                 
                 ind = match.span()[1] + ind;
@@ -93,9 +105,9 @@ def lexer(filename):
 def main():
     #Accept filename input from command line or prompt
     filename = ""
-    if len(sys.argv) <= 1:
+    if len(sys.argv) <= 1:  #Prompt user for file name
         filename = input("Input filename: ")
-    else:
+    else:   #Accept argument from command line
         filename = sys.argv[1]
     
     #Run lexical analysis function "lexer()"
@@ -106,8 +118,9 @@ def main():
     for token, lexeme in tokens:
         print("%-16s=\t%s" % (token, lexeme))
     
+    #Return tokens
     return tokens
 
-
+#Execute main function only when directly executing script
 if __name__ == "__main__":
     main()
