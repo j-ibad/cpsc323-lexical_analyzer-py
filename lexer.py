@@ -72,7 +72,7 @@ def lexer(filename):
                                 tokenPairs.append( [6, match.group()] )
                             else:   # Is a integers
                                 tokenPairs.append( [5, match.group()] )
-                            
+                        ind = match.span()[1] + ind;
                     else:   #Detect separators
                         tokenPairs.append( [token, line[ind]] )
                 ind += 1
