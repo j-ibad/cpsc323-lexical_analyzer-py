@@ -44,7 +44,7 @@ def lexer(filename):
 
     #Init variables
     tokenPairs = []
-    wordRegex = "^[a-zA-Z][a-zA-Z0-9_\$]+"
+    wordRegex = "^[a-zA-Z][a-zA-Z0-9_\$]*"
     numRegex = "[+-]?([0-9]*[.])?[0-9]+"
 
     #Traverse file line by line, char by char
@@ -72,7 +72,7 @@ def lexer(filename):
                                 tokenPairs.append( [6, match.group()] )
                             else:   # Is a integers
                                 tokenPairs.append( [5, match.group()] )
-                        ind = match.span()[1] + ind;
+                            ind = match.span()[1] + ind;
                     else:   #Detect separators
                         tokenPairs.append( [token, line[ind]] )
                 ind += 1
