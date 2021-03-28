@@ -2,4 +2,4 @@
 ! 	Single Declaration !
 int num001;
 ! 	Multiple Declaration !
-float fl001, bool flag001;
+float fl001, flag001;

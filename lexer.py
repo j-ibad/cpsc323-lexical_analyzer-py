@@ -46,9 +46,11 @@ def lexer(filename):
     tokenPairs = []
     wordRegex = "^[a-zA-Z][a-zA-Z0-9_\$]*"
     numRegex = "[+-]?([0-9]*[.])?[0-9]+"
-
+    
+    lineNum = 0
     #Traverse file line by line, char by char
     for line in file:
+        lineNum+=1
         #print(line)
         ind = 0
         while ind < len(line):
@@ -69,13 +71,13 @@ def lexer(filename):
                             print("Not exp 1: [%s]" % line[ind]) #Cant read it
                         else: #Number found
                             if '.' in match.group(): #Is a float
-                                tokenPairs.append( [6, match.group()] )
+                                tokenPairs.append( [6, match.group(), (lineNum, ind+1)] )
                             else:   # Is a integers
-                                tokenPairs.append( [5, match.group()] )
+                                tokenPairs.append( [5, match.group(), (lineNum, ind+1)] )
                             ind = match.span()[1] + ind;
                             continue
                     else:   #Detect separators
-                        tokenPairs.append( [token, line[ind]] )
+                        tokenPairs.append( [token, line[ind], (lineNum, ind+1)] )
                 ind += 1
                 #No matches found
             else:   #Keyword or identifier was found
@@ -88,9 +90,9 @@ def lexer(filename):
                 token = SYMBOL_TABLE.get(match.group())
                 #print("%s is %s" % (match.group(), token))
                 if token is None:   #Is an identifier
-                    tokenPairs.append( [2, match.group()] )
+                    tokenPairs.append( [2, match.group(), (lineNum, ind+1)] )
                 else:   #Is a keyword
-                    tokenPairs.append( [token, match.group()] )
+                    tokenPairs.append( [token, match.group(), (lineNum, ind+1)] )
                 
                 ind = match.span()[1] + ind;
             

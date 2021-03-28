@@ -32,71 +32,154 @@ import re
 types = ["int", "float", "bool"]
 relop = ['<', '<=', '==', '<>', '>=', '>']
 
+
+class TreeNode:
+    def __init__(self, val):
+        self.val = val
+        self.children = []
+        
+        
+    def addChild(self, child, index=None):
+        if index is None:
+            self.children.append(child)
+        else:
+            self.children.insert(index, child)
+        
+    def printSubtree(self, level, spacer=""):
+        print(spacer + "[val: %s;\theight: %d" % (self.val, level))
+        print(spacer + "Children: {")
+        for child in self.children:
+            if isinstance(child, TreeNode):
+                child.printSubtree(level+1, spacer + " ")
+            else:
+                print(spacer, end=" ")
+                print(child)
+        print(spacer + "} End of (%s, %d)]" % (self.val, level))
+
+
 class Parser:
     def __init__(self, fIn, fOut):
         self.index = 0
+        self.filename = fIn
         self.tokens = lexer.lexer(fIn)
         #print(self.tokens)
         self.token = None
-        self.statementList()
+        #PARSE TREE VARIABLES
+        self.parseTreeRoot = self.statementList()
+        
+        print("\nPrinting Parse Tree:\n")
+        self.parseTreeRoot.printSubtree(0)
+        
         
     def nextToken(self):
         if self.index >= len(self.tokens):
             #No more tokens error
+            self.printError("Unexpected end of file. Expected more tokens.")
             exit()
         self.token = self.tokens[self.index]
         #Write token
         print("Token:\t%-16s Lexeme:\t%s" % (self.token[0], self.token[1]))
         self.index += 1
         
+        
     def peekToken(self):
         if self.index < len(self.tokens):
             return self.tokens[self.index]
         else:
             return None
+            
+            
+    def printError(self, errorMsg):
+        print("%s:%d:%d: Error: %s" % (self.filename, self.token[2][0], self.token[2][1], errorMsg))
+        exit()
+        
+        
+    def printUnexpectedError(self, errorMsg, errorType="Error"):
+        print('%s:%d:%d: %s: Unexpected %s token "%s". %s' % (self.filename, self.token[2][0], self.token[2][1], errorType, self.token[0], self.token[1], errorMsg))
+        exit()
+        
         
     def statementList(self, ending=None):
+        subRoot = None
+        currNode = None
+    
         if isinstance(ending, list):
             while (self.peekToken() is not None) and (self.peekToken()[1] not in ending):
+                #Create new Tree Node for SL
+                nxtNode = TreeNode('SL')
+                if subRoot is None:
+                    currNode = nxtNode
+                    subRoot = currNode
+                else:
+                    currNode.addChild(nxtNode)  #Adds SL as child of parent
+                    currNode = nxtNode
+                    
                 print("\n\t<StatementList> -> <Statement> <StatementList> | <empty>")
-                self.statement()
+                currNode.addChild( self.statement() )
                 if (self.peekToken() is not None) and (self.peekToken()[1] == ';'):
                     self.nextToken()
-                    continue
+                    currNode.addChild( self.token )
         elif isinstance(ending, str):
             while (self.peekToken() is not None) and (self.peekToken()[1] != ending):
+                #Create new Tree Node for SL
+                nxtNode = TreeNode('SL')
+                if subRoot is None:
+                    currNode = nxtNode
+                    subRoot = currNode
+                else:
+                    currNode.addChild(nxtNode)  #Adds SL as child of parent
+                    currNode = nxtNode
+                
                 print("\n\t<StatementList> -> <Statement> <StatementList> | <empty>")
-                self.statement()
+                currNode.addChild( self.statement() )
                 if (self.peekToken() is not None) and (self.peekToken()[1] == ';'):
                     self.nextToken()
-                    continue
+                    currNode.addChild( self.token )
         else:
             while self.peekToken() is not None:
+                #Create new Tree Node for SL
+                nxtNode = TreeNode('SL')
+                if subRoot is None:
+                    currNode = nxtNode
+                    subRoot = currNode
+                else:
+                    currNode.addChild(nxtNode)  #Adds SL as child of parent
+                    currNode = nxtNode
+                
                 print("\n\t<StatementList> -> <Statement> <StatementList> | <empty>")
-                self.statement()
+                currNode.addChild( self.statement() )
                 if (self.peekToken() is not None) and (self.peekToken()[1] == ';'):
                     self.nextToken()
-                    continue
-            return
+                    currNode.addChild( self.token )
+        return subRoot
+    
     
     def statement(self):
+        currNode = TreeNode("S")
+        
         self.nextToken()
         #Assignment and Declarations
         if self.token[1] == "begin":
             print("\t<Statement> -> begin <StatementList> end")
-            self.statementList("end")
+            currNode.addChild( self.token )
+            currNode.addChild( self.statementList("end") )
             if self.peekToken() is not None and self.peekToken()[1] == "end":
                 self.nextToken()
-            else:
-                #ERROR: Should end with "end"
-                exit()
-                return
+                currNode.addChild( self.token )
+            else: #ERROR:   Needs "end"
+                self.printError('Expected keyword "end" after statement-list')
         elif self.token[0] == "IDENTIFIER":
             print("\t<Statement> -> <Assign>")
-            self.assign()
+            tmpToken = self.token
+            tmpNode = self.assign()
+            tmpNode.addChild( tmpToken, 0 )
+            currNode.addChild(tmpNode)
         elif self.token[1] in types:
             print("\t<Statement> -> <Declarative>")
-            self.declarative()
+            tmpToken = self.token
+            tmpNode = self.declarative()
+            tmpNode.addChild( tmpToken, 0 )
+            currNode.addChild(tmpNode)
         #Control structures
         elif self.token[1] == "if":
             print("\t<Statement> -> if <Conditional> then <Statement> else <Statement> endif")
@@ -107,67 +190,62 @@ class Parser:
                 if self.peekToken() is not None and self.peekToken()[1] == "else":
                     self.nextToken()
                     self.statementList("endif")
-                if self.peekToken()[1] == "endif":
+                if self.peekToken() is not None and self.peekToken()[1] == "endif":
                     self.nextToken()
-                else:
-                    #ERROR: Needs endif
-                    exit()
-                    return
-            else:
-                '''Does it need to have then? is this an error?'''
-                return
+                else:   #ERROR: Needs endif
+                    self.printError('Expected keyword "endif" after statement-list')
+            else: #ERROR: Needs "then"
+                self.printError('Expected keyword "then" before statement-list')
         elif self.token[1] == "while":
             print("\t<Statement> -> while <Conditional> do <Statement> whileend")
             self.conditional()
             if self.peekToken() is not None and self.peekToken()[1] == "do":
                 self.nextToken()
                 self.statementList('whileend')
-                if self.peekToken()[1] == 'whileend':
+                if self.peekToken() is not None and self.peekToken()[1] == 'whileend':
                     self.nextToken()
-                else:
-                    #ERROR: Needs "whileend"
-                    exit()
-                    return
-                '''self.statement()
-                if self.peekToken() is not None and self.peekToken()[1] == "whileend":
-                    self.nextToken()
-                else:
-                    #ERROR should have "whileend"
-                    exit()
-                    return'''
-            else:
-                #ERROR, should have "do"
-                exit()
-                return
+                else:   #ERROR: Needs "whileend"
+                    self.printError('Expected keyword "whileend" after statement-list')
+            else:   #ERROR: should have "do"
+                self.printError('Expected keyword "do" before statement-list')
+        else:   #ERROR: Next token does not form a statement
+            self.printUnexpectedError(' Was expecting a statement.')
+        return currNode
         
-        else:
-            #ERROR
-            exit()
-            return
-            
     def assign(self):
+        currNode = TreeNode("A")
         self.nextToken()
         if self.token[1] == "=":
             print("\t<Assign> -> <ID> = <Expression>;")
-            self.expression()
-        else:
-            #ERROR
-            exit()
-            return
+            currNode.addChild( self.token )
+            currNode.addChild( self.expression() )
+        else: #ERROR: Expecting "=" for assignment statement.
+            self.printUnexpectedError('Was expecting operator "=" for assignment statement')
+        return currNode
+
 
     #EXTRA: How about declarative assignments? "int x=1;"
     def declarative(self):
+        subRoot = TreeNode("D")
         self.nextToken() #ID
+        subRoot.addChild( self.token )
+        currNode = subRoot
         print("\t<Declarative> -> <Type> <ID> <MoreIds>; | <empty>")
-        while self.peekToken() is not None and self.peekToken()[1] == ',' and self.peekToken()[1] != ";":
+        while self.peekToken() is not None and self.peekToken()[1] == ',':
+            tmpNode = TreeNode("MI")
             self.nextToken()
-            if self.peekToken() is not None and (self.peekToken()[1] not in types): #or self.peekToken()[0] == "IDENTIFIER" #To allow int x, y;
-                #TRUE ERROR
-                exit()
-                return
+            tmpNode.addChild( self.token )
+            if self.peekToken() is not None and (self.peekToken()[0] != "IDENTIFIER"): #ERROR: Invalid multiple declarative statement
+                self.nextToken()
+                self.printUnexpectedError('Was expecting an IDENTIFIER token for more declarations')
             print("\t<MoreIds> -> , <ID> <MoreIds> | <empty>")
             self.nextToken()
-            self.nextToken()
+            tmpNode.addChild( self.token )
+            currNode.addChild( tmpNode )
+            currNode = tmpNode
+        currNode.addChild( "<empty>" )
+        return subRoot
+        
         
     def expression(self):
         print("\t<Expression> -> <Term> | <Term> + <Expression> | <Term> - <Expression>")
@@ -177,6 +255,7 @@ class Parser:
             self.nextToken()
             self.expression()
         
+        
     def term(self):
         print("\t<Term> -> <Term> * <Factor> | <Term> / <Factor> | <Factor>")
         self.factor()
@@ -185,25 +264,21 @@ class Parser:
             self.nextToken()
             self.term();
     
+    
     def factor(self):
         self.nextToken()
         print("\t<Factor> -> ( <Expression> ) | <ID> | <num>")
         if self.token[1] == '(':
             self.expression()
             self.nextToken()
-            if self.token[1] != ')':
-                #ERROR
-                exit()
-                return
+            if self.token[1] != ')': #ERROR: Expected ')' after expression
+                self.printUnexpectedError("Expected SEPARATOR ')' after expression")
         elif self.token[0] in ['IDENTIFIER', 'INTEGER', 'FLOAT'] or self.token[1] in ['True', 'False']:
-            #valid
-            #print( self.token[0] )
-            return
-        else:
-            #ERROR
-            exit()
-            return
-            
+            return  #IS VALID. Return to go back to callee function
+        else:   #ERROR: Not a valid Factor.
+            self.printUnexpectedError("Expected a Factor in the form of ( <Expression> ), or an IDENTIFIER, or NUMERIC token", "Error: Invalid Factor")
+        
+        
     #EXTRA: <Conditional> -> ( <Conditional> )
     def conditional(self):
         print("\t<Conditional> -> <Expression> <Relop> <Expression> | <Expression>")
@@ -225,10 +300,13 @@ class Parser:
             elif tmpTok[1] == "=":
                 self.nextToken()
                 tmpTok2 = self.peekToken()
-                if tmpTok2 is not None and tmpTok2[1] == '=':
-                    self.nextToken()
-                    self.expression() #Eval as ==
-            #Potential error here ? ? ?
+                if tmpTok2 is not None:
+                    if tmpTok2[1] == '=':
+                        self.nextToken()
+                        self.expression() #Eval as ==
+                    else:   #Eval as assignment, counted as invalid
+                        self.printUnexpectedError("Expected RELATIVE OPERATOR between expressions. Did you mean '=='?")
+        #OTHERWISE just a lone expression. (Valid)
         
             
         
