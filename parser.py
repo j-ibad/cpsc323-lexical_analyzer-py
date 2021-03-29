@@ -45,9 +45,9 @@ class TreeNode:
         else:
             self.children.insert(index, child)
         
+        
     def printSubtree(self, level, spacer=""):
-        print(spacer + "[val: %s;\theight: %d" % (self.val, level))
-        print(spacer + "Children: {")
+        print(spacer + '["%s"\theight: %d, ' % (self.val, level) + "Children: {")
         for child in self.children:
             if isinstance(child, TreeNode):
                 child.printSubtree(level+1, spacer + " ")
@@ -156,7 +156,6 @@ class Parser:
     
     def statement(self):
         currNode = TreeNode("S")
-        
         self.nextToken()
         #Assignment and Declarations
         if self.token[1] == "begin":
@@ -182,28 +181,35 @@ class Parser:
             currNode.addChild(tmpNode)
         #Control structures
         elif self.token[1] == "if":
+            currNode.addChild( self.token )
             print("\t<Statement> -> if <Conditional> then <Statement> else <Statement> endif")
-            self.conditional()
+            currNode.addChild( self.conditional() )
             if self.peekToken() is not None and self.peekToken()[1] == "then":
                 self.nextToken()
-                self.statementList(["else", "endif"])
+                currNode.addChild( self.token )
+                currNode.addChild( self.statementList(["else", "endif"]) )
                 if self.peekToken() is not None and self.peekToken()[1] == "else":
                     self.nextToken()
-                    self.statementList("endif")
+                    currNode.addChild( self.token )
+                    currNode.addChild( self.statementList("endif") )
                 if self.peekToken() is not None and self.peekToken()[1] == "endif":
                     self.nextToken()
+                    currNode.addChild( self.token )
                 else:   #ERROR: Needs endif
                     self.printError('Expected keyword "endif" after statement-list')
             else: #ERROR: Needs "then"
                 self.printError('Expected keyword "then" before statement-list')
         elif self.token[1] == "while":
+            currNode.addChild( self.token )
             print("\t<Statement> -> while <Conditional> do <Statement> whileend")
-            self.conditional()
+            currNode.addChild( self.conditional() )
             if self.peekToken() is not None and self.peekToken()[1] == "do":
                 self.nextToken()
-                self.statementList('whileend')
+                currNode.addChild( self.token )
+                currNode.addChild( self.statementList('whileend') )
                 if self.peekToken() is not None and self.peekToken()[1] == 'whileend':
                     self.nextToken()
+                    currNode.addChild( self.token )
                 else:   #ERROR: Needs "whileend"
                     self.printError('Expected keyword "whileend" after statement-list')
             else:   #ERROR: should have "do"
@@ -248,65 +254,82 @@ class Parser:
         
         
     def expression(self):
+        currNode = TreeNode("E")
         print("\t<Expression> -> <Term> | <Term> + <Expression> | <Term> - <Expression>")
-        self.term()
+        currNode.addChild( self.term() )
         tmpTok = self.peekToken()
         if tmpTok is not None and tmpTok[1] in ['+', '-']:
             self.nextToken()
-            self.expression()
+            currNode.addChild( self.token )
+            currNode.addChild( self.expression() )
+        return currNode
         
         
     def term(self):
+        currNode = TreeNode("T")
         print("\t<Term> -> <Term> * <Factor> | <Term> / <Factor> | <Factor>")
-        self.factor()
+        currNode.addChild( self.factor() )
         tmpTok = self.peekToken()
         if tmpTok is not None and tmpTok[1] in ['*', '/']:
             self.nextToken()
-            self.term();
+            currNode.addChild( self.token )
+            currNode.addChild( self.term() )
+        return currNode
     
     
     def factor(self):
+        currNode = TreeNode("F")
         self.nextToken()
+        currNode.addChild( self.token )
         print("\t<Factor> -> ( <Expression> ) | <ID> | <num>")
         if self.token[1] == '(':
-            self.expression()
+            currNode.addChild( self.expression() )
             self.nextToken()
+            currNode.addChild( self.token )
             if self.token[1] != ')': #ERROR: Expected ')' after expression
                 self.printUnexpectedError("Expected SEPARATOR ')' after expression")
         elif self.token[0] in ['IDENTIFIER', 'INTEGER', 'FLOAT'] or self.token[1] in ['True', 'False']:
-            return  #IS VALID. Return to go back to callee function
+            return currNode #IS VALID. Return to go back to callee function
         else:   #ERROR: Not a valid Factor.
             self.printUnexpectedError("Expected a Factor in the form of ( <Expression> ), or an IDENTIFIER, or NUMERIC token", "Error: Invalid Factor")
-        
+        return currNode
         
     #EXTRA: <Conditional> -> ( <Conditional> )
     def conditional(self):
+        currNode = TreeNode("C")
         print("\t<Conditional> -> <Expression> <Relop> <Expression> | <Expression>")
-        self.expression()
+        currNode.addChild( self.expression() )
         tmpTok = self.peekToken()
         if tmpTok is not None:
             if tmpTok[1] == "<":
                 self.nextToken()
+                currNode.addChild( self.token )
                 tmpTok2 = self.peekToken()
                 if tmpTok2 is not None and tmpTok2[1] in ['=', '>']:
                     self.nextToken() #Eval as "<=" or "<>"
-                self.expression() #Eval as "<"
+                    currNode.addChild( self.token )
+                currNode.addChild( self.expression() ) #Eval as "<"
             elif tmpTok[1] == ">":
                 self.nextToken()
+                currNode.addChild( self.token )
                 tmpTok2 = self.peekToken()
                 if tmpTok2 is not None and tmpTok2[1] == "=":
                     self.nextToken() # Eval as >=
-                self.expression() #Eval as >
+                    currNode.addChild( self.token )
+                currNode.addChild( self.expression() ) #Eval as >
             elif tmpTok[1] == "=":
                 self.nextToken()
+                currNode.addChild( self.token )
                 tmpTok2 = self.peekToken()
                 if tmpTok2 is not None:
                     if tmpTok2[1] == '=':
                         self.nextToken()
-                        self.expression() #Eval as ==
+                        currNode.addChild( self.token )
+                        currNode.addChild( self.expression() )#Eval as ==
                     else:   #Eval as assignment, counted as invalid
                         self.printUnexpectedError("Expected RELATIVE OPERATOR between expressions. Did you mean '=='?")
         #OTHERWISE just a lone expression. (Valid)
+        return currNode
         
             
         
