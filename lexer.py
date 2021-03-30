@@ -4,6 +4,7 @@
 import sys
 import re
 
+#Symbol table, mapping symbols to token types
 SYMBOL_TABLE = {
     #Keywords
     "int": 1, "float":1, "bool":1, "True":1, "False":1,
@@ -20,6 +21,7 @@ SYMBOL_TABLE = {
     "*":4, "+":4, "-":4, "=":4, 
     "/":4, ">":4, "<":4, "%":4
 }
+#Mapping between numerical token types to string form
 TOKEN_TABLE = {
     1: "KEYWORD",
     2: "IDENTIFIER",
@@ -29,11 +31,13 @@ TOKEN_TABLE = {
     6: "FLOAT"
 }
 
-
+#Turns numerical internal notation to string form of token
 def numToToken(tokenPairs):
     for i in range(0, len(tokenPairs)):
         tokenPairs[i][0] = TOKEN_TABLE.get(tokenPairs[i][0])
 
+
+#Performs lexical analysis on the file inputted
 def lexer(filename):
     #Open file
     try:
@@ -45,7 +49,7 @@ def lexer(filename):
     #Init variables
     tokenPairs = []
     wordRegex = "^[a-zA-Z][a-zA-Z0-9_\$]*"
-    numRegex = "[+-]?([0-9]*[.])?[0-9]+"
+    numRegex = "[+-]?[0-9]+([.][0-9]*)?"
     
     lineNum = 0
     #Traverse file line by line, char by char
