@@ -2,9 +2,10 @@
 
 #Project files
 import lexer
+import parser
 
 def main():
-    lexer.main()
+    parser.main()
 
 if __name__ == "__main__":
     main()

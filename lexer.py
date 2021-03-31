@@ -122,7 +122,7 @@ def main():
     
     #Print tokens
     print("%-16s\t%s\n" % ("TOKENS", "Lexemes"))
-    for token, lexeme in tokens:
+    for token, lexeme, loc in tokens:
         print("%-16s=\t%s" % (token, lexeme))
     
     #Return tokens
