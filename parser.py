@@ -92,6 +92,9 @@ class Parser:
         self.printBuffer = []
         #Perform lexical analysis
         self.tokens = lexer.lexer(fIn)
+        if self.tokens is None or self.tokens[0][0] == -1:
+            print("Could not analyze file. Check if file exists and is readable.")
+            exit()
         
         self.realStdOut = sys.stdout
         #File output
