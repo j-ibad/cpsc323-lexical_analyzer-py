@@ -4,8 +4,8 @@
 import sys
 import re
 
-#Symbol table, mapping symbols to token types
-SYMBOL_TABLE = {
+#Symbol map, mapping symbols to token types
+SYMBOL_MAP = {
     #Keywords
     "int": 1, "float":1, "bool":1, "True":1, "False":1,
     "if":1, "else":1, "then":1, "endif":1, "endelse":1,
@@ -68,7 +68,7 @@ def lexer(filename):
                     ind += 1
                     continue
                 else:
-                    token = SYMBOL_TABLE.get(line[ind])
+                    token = SYMBOL_MAP.get(line[ind])
                     if token is None:
                         match = re.search(numRegex, line[ind:])
                         if match is None:
@@ -91,7 +91,7 @@ def lexer(filename):
                     #Cant read it. Should not reach here.
                 
                 #Detect indentifiers
-                token = SYMBOL_TABLE.get(match.group())
+                token = SYMBOL_MAP.get(match.group())
                 #print("%s is %s" % (match.group(), token))
                 if token is None:   #Is an identifier
                     tokenPairs.append( [2, match.group(), (lineNum, ind+1)] )
@@ -101,7 +101,6 @@ def lexer(filename):
                 ind = match.span()[1] + ind;
             
     #Convert nums tokens to string tokens
-    #REMOVE IN FUTURE PROJECTS
     numToToken(tokenPairs)
     
     #Return

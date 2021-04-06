@@ -14,32 +14,10 @@ Authors:    Winnie Pan
 import lexer
 import sys
 import re
+import getopt
 
-'''
-Some grammars:
-<Statement> -> <Declarative>
-<Statement> -> <Assign>
-...
-<Declarative> -> <Type> <id>
-...
-<Type> -> {"int", "float", "bool"}
-
-<Assign> -> <ID> = <Expression>
-...
-<Expression> -> <Expression> + <Term> | <Expression> - <Term> | <Term>
-<Expression> -> <Term> | <Term> + <Expression> | <Term> - <Expression>
-<Term> -> <Term> * <Factor> | <Term> / <Factor> | <Factor>
-
-...
-
-
-...
-<Statement> -> if <Conditional> then <StatementList> else <Statement> endif
-    |   while <Conditional> do <StatementList> whileend
-    |   begin <StatementList> end
-    
-<Conditional> -> <Expression> <Relop> <Expression> | <Expression>
-'''
+#Global variable to help when multiple files are processed
+firstFile = True
 
 #List of types recognized by compiler
 types = ["int", "float", "bool"]
@@ -107,16 +85,30 @@ class Parser:
     #   on the tokens received, outputting to the output file.
     #   Generates a parse tree.
     def __init__(self, fIn, fOut):
+        #Initilize tracking variables
         self.index = 0
         self.filename = fIn
-        self.tokens = lexer.lexer(fIn)
-        #print(self.tokens)
         self.token = None
+        self.printBuffer = []
+        #Perform lexical analysis
+        self.tokens = lexer.lexer(fIn)
+        
+        self.realStdOut = sys.stdout
+        #File output
+        global firstFile
+        if fOut:
+            sys.stdout = open(fOut, "w" if firstFile else "a+")
+            firstFile = False
+            
         #PARSE TREE VARIABLES
-        self.parseTreeRoot = self.statementList()
+        print("[---Analysis of \"%s\"---]\n" % fIn)
+        self.parseTree = self.statementList()
         
         print("\nPrinting Parse Tree:\n")
-        self.parseTreeRoot.printSubtree()
+        self.parseTree.printSubtree()
+        
+        print("\n[---Successful end of \"%s\"---]\n" % fIn)
+        sys.stdout = self.realStdOut
     
     
     # Iterates to the next token in the list, printing it to output.
@@ -127,7 +119,8 @@ class Parser:
             self.printError("Unexpected end of file. Expected more tokens.")
         self.token = self.tokens[self.index]
         #Write token
-        print("Token:\t%-16s Lexeme:\t%s" % (self.token[0], self.token[1]))
+        #print("Token:\t%-16s Lexeme:\t%s" % (self.token[0], self.token[1]))
+        print("Token:\t%-10s @%4d,%-4d Lexeme:\t%s" % (self.token[0], self.token[2][0], self.token[2][1], self.token[1]))
         self.index += 1
     
     
@@ -145,7 +138,7 @@ class Parser:
         if self.index < len(self.tokens):
             self.token = self.tokens.pop(self.index)
             #Write token
-            print("Token:\t%-16s Lexeme:\t%s" % (self.token[0], self.token[1]))
+            print("Token:\t%-16s @%4d,%-4d Lexeme:\t%s" % (self.token[0], self.token[2][0], self.token[2][1], self.token[1]))
             return self.token
         else:
             self.printError("Unexpected end of file. Expected more tokens.")
@@ -154,14 +147,24 @@ class Parser:
     # Prints an error message
     def printError(self, errorMsg):
         print("%s:%d:%d: Error: %s" % (self.filename, self.token[2][0], self.token[2][1], errorMsg))
+        if sys.stdout != self.realStdOut:
+            sys.stdout = self.realStdOut
+            print("%s:%d:%d: Error: %s" % (self.filename, self.token[2][0], self.token[2][1], errorMsg))
         exit()
     
     
     # Special error that prints the unexpected token along with the error message
     def printUnexpectedError(self, errorMsg, errorType="Error"):
         print('%s:%d:%d: %s: Unexpected %s token "%s". %s' % (self.filename, self.token[2][0], self.token[2][1], errorType, self.token[0], self.token[1], errorMsg))
+        if sys.stdout != self.realStdOut:
+            sys.stdout = self.realStdOut
+            print('%s:%d:%d: %s: Unexpected %s token "%s". %s' % (self.filename, self.token[2][0], self.token[2][1], errorType, self.token[0], self.token[1], errorMsg))
         exit()
     
+    # Prints everything in the print buffer
+    def flushPrintBuffer(self):
+        while self.printBuffer:
+            print( self.printBuffer.pop(0) )
     
     # Expression
     #   Production rules: <StatementList> -> <Statement> <StatementList> | <empty>
@@ -182,7 +185,7 @@ class Parser:
                     currNode.addChild(nxtNode)  #Adds SL as child of parent
                     currNode = nxtNode
                     
-                print("\n\t<StatementList> -> <Statement> <StatementList> | <empty>")
+                self.printBuffer.append("\t<StatementList> -> <Statement> <StatementList> | <empty>")
                 currNode.addChild( self.statement() )
                 if (self.peekToken() is not None) and (self.peekToken()[1] == ';'):
                     self.nextToken()
@@ -198,7 +201,7 @@ class Parser:
                     currNode.addChild(nxtNode)  #Adds SL as child of parent
                     currNode = nxtNode
                 
-                print("\n\t<StatementList> -> <Statement> <StatementList> | <empty>")
+                self.printBuffer.append("\t<StatementList> -> <Statement> <StatementList> | <empty>")
                 currNode.addChild( self.statement() )
                 if (self.peekToken() is not None) and (self.peekToken()[1] == ';'):
                     self.nextToken()
@@ -214,11 +217,12 @@ class Parser:
                     currNode.addChild(nxtNode)  #Adds SL as child of parent
                     currNode = nxtNode
                 
-                print("\n\t<StatementList> -> <Statement> <StatementList> | <empty>")
+                self.printBuffer.append("\t<StatementList> -> <Statement> <StatementList> | <empty>")
                 currNode.addChild( self.statement() )
                 if (self.peekToken() is not None) and (self.peekToken()[1] == ';'):
                     self.nextToken()
                     currNode.addChild( self.token )
+        self.flushPrintBuffer()
         return subRoot
     
     
@@ -230,7 +234,9 @@ class Parser:
     #   Represented in parse tree as non-leaf node with value "S"
     def statement(self):
         currNode = TreeNode("S")
+        print("") #Padding between statements for a cleaner look
         self.nextToken()
+        self.flushPrintBuffer()
         if self.token[1] == "begin":
             print("\t<Statement> -> begin <StatementList> end")
             currNode.addChild( self.token )
@@ -298,9 +304,10 @@ class Parser:
     #   Represented in parse tree as non-leaf node with value "A"    
     def assign(self):
         currNode = TreeNode("A")
-        self.nextToken()
-        if self.token[1] == "=":
+        tmpTok = self.peekToken()
+        if tmpTok is not None and tmpTok[1] == "=":
             print("\t<Assign> -> <ID> = <Expression>;")
+            self.nextToken()
             currNode.addChild( self.token )
             currNode.addChild( self.expression() )
         else: #ERROR: Expecting "=" for assignment statement.
@@ -313,13 +320,12 @@ class Parser:
     #                       <MoreIds> -> , <ID> <MoreIds> | <empty
     #   Represented in parse tree as non-leaf node with value "D"
     #   MoreIDs are represented as "MI"
-    #TODO: EXTRA: How about declarative assignments? "int x=1;"
     def declarative(self):
         subRoot = TreeNode("D")
+        print("\t<Declarative> -> <Type> <ID> <MoreIds>; | <empty>")
         self.nextToken() #ID
         subRoot.addChild( self.token )
         currNode = subRoot
-        print("\t<Declarative> -> <Type> <ID> <MoreIds>; | <empty>")
         while self.peekToken() is not None and self.peekToken()[1] == ',':
             tmpNode = TreeNode("MI")
             self.nextToken()
@@ -343,13 +349,14 @@ class Parser:
     #   left recursion. This will be handled later by the object code generator.
     def expression(self):
         currNode = TreeNode("E")
-        print("\t<Expression> -> <Term> | <Term> + <Expression> | <Term> - <Expression>")
+        self.printBuffer.append("\t<Expression> -> <Term> | <Term> + <Expression> | <Term> - <Expression>")
         currNode.addChild( self.term() )
         tmpTok = self.peekToken()
         if tmpTok is not None and tmpTok[1] in ['+', '-']:
             self.nextToken()
             currNode.addChild( self.token )
             currNode.addChild( self.expression() )
+        self.flushPrintBuffer()
         return currNode
 
         
@@ -360,25 +367,27 @@ class Parser:
     #   left recursion. This will be handled later by the object code generator.
     def term(self):
         currNode = TreeNode("T")
-        print("\t<Term> -> <Term> * <Factor> | <Term> / <Factor> | <Factor>")
+        self.printBuffer.append("\t<Term> -> <Term> * <Factor> | <Term> / <Factor> | <Factor>")
         currNode.addChild( self.factor() )
         tmpTok = self.peekToken()
         if tmpTok is not None and tmpTok[1] in ['*', '/']:
             self.nextToken()
             currNode.addChild( self.token )
             currNode.addChild( self.term() )
+        self.flushPrintBuffer()
         return currNode
     
     
     # Factor:
-    #   Production rules: <Factor> -> '(' <Expression> ')' | <ID> | ('+' | '-')?(<FLOAT> | ('.')?<INT>)
+    #   Production rules: <Factor> -> '(' <Expression> ')' | <ID> | ('+' | '-')?(<FLOAT> | ('.')?<INT>) | 'True' | 'False'
     #   Represented in parse tree as non-leaf node with value "F"
     # Note: Additional processing of numbers are performed here to recognize all forms of numericals
     def factor(self):
         currNode = TreeNode("F")
         self.nextToken()
         currNode.addChild( self.token )
-        print("\t<Factor> -> '(' <Expression> ')' | <ID> | ('+' | '-')?(<FLOAT> | ('.')?<INT>)")
+        self.flushPrintBuffer()
+        print("\t<Factor> -> '(' <Expression> ')' | <ID> | ('+' | '-')?(<FLOAT> | ('.')?<INT>) | 'True' | 'False'")
         if self.token[1] == '(':
             currNode.addChild( self.expression() )
             self.nextToken()
@@ -417,10 +426,9 @@ class Parser:
     # Conditional
     #   Production rules: <Conditional> -> <Expression> <Relop> <Expression> | <Expression>
     #   Represented in parse tree as non-leaf node with value "C"
-    #TODO: EXTRA: <Conditional> -> ( <Conditional> )
     def conditional(self):
         currNode = TreeNode("C")
-        print("\t<Conditional> -> <Expression> <Relop> <Expression> | <Expression>")
+        self.printBuffer.append("\t<Conditional> -> <Expression> <Relop> <Expression> | <Expression>")
         currNode.addChild( self.expression() )
         tmpTok = self.peekToken()
         if tmpTok is not None:
@@ -452,29 +460,49 @@ class Parser:
                     else:   #Eval as assignment, counted as invalid
                         self.printUnexpectedError("Expected RELATIVE OPERATOR between expressions. Did you mean '=='?")
         #OTHERWISE just a lone expression. (Valid)
+        self.flushPrintBuffer()
         return currNode
         
             
-        
+
 
 def main():
-    #Accept filename input from command line or prompt
-    filename = ""
-    if len(sys.argv) <= 1:  #Prompt user for file name
-        filename = input("Input filename: ")
-    else:   #Accept argument from command line
-        filename = sys.argv[1]
-    
-    #Run lexical analysis function "lexer()"
-    parseTree = Parser(filename, None)
-    '''
-    #Print tokens
-    print("%-16s\t%s\n" % ("TOKENS", "Lexemes"))
-    for token, lexeme in tokens:
-        print("%-16s=\t%s" % (token, lexeme))'''
-    
-    #Return tokens
-    #return
+    #Read command line arguments
+    mFlags, files = getopt.gnu_getopt(sys.argv[1:], "ho:", ["help"])
+    outFile = None
+
+    #Process command line arguments
+    for opt, arg in mFlags:
+        if opt in ('-h', "--help"):
+            print("USAGE: parser.py <FILE> [<FILE> ...] [-o <OUTFILE>]")
+            exit()
+        elif opt == '-o':
+            outFile = arg
+        else:
+            print("Option '%s' not recognized" % opt)
+
+    #Prompt for input if none given
+    if len(files) < 1:  #Prompt user for file name
+        files = input("Input filename(s): ").split(",")
+        if files is None or len(files[0]) == 0:
+            print("A valid filename must be entered.")
+            exit()
+        for i in range(0, len(files)):
+            files[i] = files[i].strip() #Remove leading and heading whitespace
+        if not outFile:
+            outFile = input("Output filename (default: console): ")
+            if not outFile:
+                outFile = None
+                print("\tDefaulting to standard output.")
+
+    #Perform syntax analysis on all input files
+    parseForest = []
+    for filename in files:
+        parser = Parser(filename, outFile)
+        parseForest.append(parser.parseTree)
+
+    #Return parse forest (list of parse trees from all input files)
+    return parseForest
 
 
 #Execute main function only when directly executing script
